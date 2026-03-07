@@ -1,29 +1,47 @@
 # prehook
 
-`prehook` is a local Git hook security gate CLI for `pre-commit` and `pre-push`.
+Stop secrets before they ship. `prehook` is a single-binary CLI that installs local `pre-commit` and `pre-push` Git hooks to scan for leaked secrets, vulnerable dependencies, and code quality issues -- before your code ever leaves your machine.
+
+## Install
+
+### From source (requires Go 1.23+)
+
+```bash
+go install github.com/arunlabs/prehook@latest
+```
+
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap arunlabs/tap
+brew install prehook
+```
+
+### Binary download
+
+Download the latest release from the [Releases](https://github.com/arunlabs/prehook/releases) page. Extract and place the `prehook` binary somewhere on your `PATH`.
 
 ## Quickstart
 
-1. Build or install `prehook` so it is available on your PATH.
-2. Initialize config in your repository root:
+1. Initialize config in your repository root:
 
 ```bash
 prehook init
 ```
 
-3. Install managed hooks:
+2. Install managed hooks:
 
 ```bash
 prehook install
 ```
 
-4. Check local dependencies:
+3. Check local dependencies:
 
 ```bash
 prehook doctor
 ```
 
-5. Enforce pinned scanner versions (optional hard mode):
+4. Enforce pinned scanner versions (optional hard mode):
 
 ```bash
 prehook doctor --require-pins
@@ -99,9 +117,9 @@ pre_push:
     timeout: 8m
     severity: HIGH,CRITICAL
   quality:
-    enabled: true
+    enabled: true        # opt-in: set your own test command
     blocking: true
-    test_command: go test ./...
+    test_command: go test ./...   # replace with your language's test runner
     test_timeout: 10m
     coverage:
       enabled: true
