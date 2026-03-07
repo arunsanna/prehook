@@ -130,14 +130,14 @@ func DefaultConfig() Config {
 				Severity: "HIGH,CRITICAL",
 			},
 			Quality: QualityConfig{
-				Enabled:     true,
+				Enabled:     false,
 				Blocking:    true,
-				TestCommand: "go test ./...",
+				TestCommand: "",
 				TestTimeout: "10m",
 				CoverageGate: CoverageConfig{
-					Enabled:   true,
+					Enabled:   false,
 					Blocking:  true,
-					Command:   "go test ./... -coverprofile=coverage.out",
+					Command:   "",
 					Timeout:   "15m",
 					Threshold: 60,
 					File:      "coverage.out",

@@ -26,7 +26,7 @@ func runCLI(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) 
 		err = cmdRun(commandArgs, stdin, stdout, stderr)
 	case "cleanup":
 		err = cmdCleanup(commandArgs, stdout, stderr)
-	case "version":
+	case "version", "-v", "--version":
 		_, err = fmt.Fprintln(stdout, version)
 	case "help", "-h", "--help":
 		printUsage(stdout)
