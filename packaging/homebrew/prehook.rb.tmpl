@@ -12,7 +12,6 @@ class Prehook < Formula
   depends_on "semgrep"
   depends_on "osv-scanner"
   depends_on "trivy"
-  depends_on "git-filter-repo"
 
   def install
     ldflags = "-s -w -X main.version=#{version}"

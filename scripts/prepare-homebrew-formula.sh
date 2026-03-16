@@ -60,7 +60,7 @@ archive_url="https://github.com/${owner}/${repo}/archive/refs/tags/v${version}.t
 echo "Fetching ${archive_url} for sha256..."
 
 sha256="$(
-  curl -fsSL "$archive_url" | shasum -a 256 | awk '{print $1}'
+  curl -fsSL "$archive_url" | openssl dgst -sha256 -r | awk '{print $1}'
 )"
 
 scripts/render-homebrew-formula.sh \
