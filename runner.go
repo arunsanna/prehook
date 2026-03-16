@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -64,6 +65,9 @@ func RunBinary(timeout time.Duration, dir string, name string, args []string, st
 }
 
 func RunShell(timeout time.Duration, dir string, command string) CommandResult {
+	if runtime.GOOS == "windows" {
+		return RunBinary(timeout, dir, "cmd.exe", []string{"/C", command}, nil)
+	}
 	return RunBinary(timeout, dir, "sh", []string{"-c", command}, nil)
 }
 
