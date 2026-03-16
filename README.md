@@ -17,9 +17,24 @@ brew tap arunlabs/tap
 brew install prehook
 ```
 
+### Scoop (Windows)
+
+```powershell
+scoop bucket add arunlabs https://github.com/arunlabs/scoop-bucket
+scoop install prehook
+```
+
 ### Binary download
 
-Download the latest release from the [Releases](https://github.com/arunlabs/prehook/releases) page. Extract and place the `prehook` binary somewhere on your `PATH`.
+Download the latest release from the [Releases](https://github.com/arunlabs/prehook/releases) page.
+
+| Platform | Archive                                   | Binary        |
+| -------- | ----------------------------------------- | ------------- |
+| macOS    | `prehook_*_darwin_amd64.tar.gz` / `arm64` | `prehook`     |
+| Linux    | `prehook_*_linux_amd64.tar.gz` / `arm64`  | `prehook`     |
+| Windows  | `prehook_*_windows_amd64.zip` / `arm64`   | `prehook.exe` |
+
+Extract and place the binary somewhere on your `PATH`.
 
 ## Quickstart
 
@@ -76,14 +91,19 @@ prehook doctor --require-pins
 
 ## Tool Dependencies
 
-- `git`
-- `go`
-- `gitleaks`
-- `trufflehog`
-- `semgrep`
-- `osv-scanner`
-- `trivy`
-- `git-filter-repo` (optional for cleanup workflow)
+prehook delegates scanning to external tools. Install the ones you enable in `.prehook.yaml`:
+
+| Tool              | Required by        | macOS / Linux                                  | Windows                                                                   |
+| ----------------- | ------------------ | ---------------------------------------------- | ------------------------------------------------------------------------- |
+| `git`             | all                | preinstalled / `apt install git`               | [git-scm.com](https://git-scm.com)                                        |
+| `gitleaks`        | pre-commit         | `brew install gitleaks`                        | `scoop install gitleaks`                                                  |
+| `trufflehog`      | pre-commit         | `brew install trufflehog`                      | [GitHub releases](https://github.com/trufflesecurity/trufflehog/releases) |
+| `semgrep`         | pre-push           | `brew install semgrep` / `pip install semgrep` | `pip install semgrep`                                                     |
+| `osv-scanner`     | pre-push           | `brew install osv-scanner`                     | `scoop install osv-scanner`                                               |
+| `trivy`           | pre-push           | `brew install trivy`                           | `scoop install trivy`                                                     |
+| `git-filter-repo` | cleanup (optional) | `brew install git-filter-repo`                 | `pip install git-filter-repo`                                             |
+
+Run `prehook doctor` after installing to verify everything is found and version-compatible.
 
 ## Example Config
 
@@ -117,9 +137,9 @@ pre_push:
     timeout: 8m
     severity: HIGH,CRITICAL
   quality:
-    enabled: true        # opt-in: set your own test command
+    enabled: true # opt-in: set your own test command
     blocking: true
-    test_command: go test ./...   # replace with your language's test runner
+    test_command: go test ./... # replace with your language's test runner
     test_timeout: 10m
     coverage:
       enabled: true
