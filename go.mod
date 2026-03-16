@@ -1,4 +1,4 @@
-module prehook
+module github.com/arunlabs/prehook
 
 go 1.25.0
 
