@@ -179,7 +179,7 @@ func parsePushRefs(r io.Reader) ([]PushRef, error) {
 	return refs, nil
 }
 
-func collectPrePushFiles(repoRoot string, refs []PushRef) ([]string, error) {
+func collectPrePushFiles(repoRoot string, remoteName string, refs []PushRef) ([]string, error) {
 	unique := map[string]struct{}{}
 
 	for _, ref := range refs {
@@ -190,7 +190,11 @@ func collectPrePushFiles(repoRoot string, refs []PushRef) ([]string, error) {
 		var output string
 		var err error
 		if isZeroSHA(ref.RemoteSHA) {
-			output, err = runGitText(repoRoot, 45*time.Second, "diff-tree", "--no-commit-id", "--name-only", "-r", ref.LocalSHA)
+			notRef := "--remotes"
+			if strings.TrimSpace(remoteName) != "" {
+				notRef = fmt.Sprintf("--remotes=%s", remoteName)
+			}
+			output, err = runGitText(repoRoot, 45*time.Second, "log", "--format=", "--name-only", ref.LocalSHA, "--not", notRef)
 		} else {
 			output, err = runGitText(repoRoot, 45*time.Second, "diff", "--name-only", ref.RemoteSHA, ref.LocalSHA)
 		}

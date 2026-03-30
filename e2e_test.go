@@ -88,6 +88,58 @@ exit 0
 	}
 }
 
+func TestPreCommitSuppressesAllowlistedGitleaksFinding(t *testing.T) {
+	repo := initTempRepo(t)
+	writeFile(t, filepath.Join(repo, "secret.txt"), "token=example-test-secret\n")
+	runGit(t, repo, "add", "secret.txt")
+
+	cfg := DefaultConfig()
+	cfg.PreCommit.Gitleaks.Enabled = true
+	cfg.PreCommit.Trufflehog.Enabled = false
+	cfg.PrePush.Semgrep.Enabled = false
+	cfg.PrePush.OSV.Enabled = false
+	cfg.PrePush.Trivy.Enabled = false
+	cfg.PrePush.Quality.Enabled = false
+	cfg.Allowlist = []AllowlistEntry{{
+		Pattern:   "example-test-secret",
+		Reason:    "fixture data",
+		Owner:     "security@company.com",
+		ExpiresOn: "2030-01-01",
+	}}
+	writeConfig(t, repo, cfg)
+
+	binDir := t.TempDir()
+	writeExecutable(t, filepath.Join(binDir, "gitleaks"), `#!/bin/sh
+if [ "${1:-}" = "version" ]; then
+  echo "gitleaks 8.24.2"
+  exit 0
+fi
+config=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--config" ]; then
+    config="$arg"
+  fi
+  prev="$arg"
+done
+if [ -n "$config" ]; then
+  exit 0
+fi
+exit 1
+`)
+
+	withPathAndCwd(t, binDir, repo)
+
+	var out bytes.Buffer
+	err := cmdRun([]string{"--stage", "pre-commit"}, strings.NewReader(""), &out, &out)
+	if err != nil {
+		t.Fatalf("expected pre-commit to pass after allowlist suppression, got %v\noutput:\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "[ OK ] gitleaks") {
+		t.Fatalf("expected gitleaks success output, got:\n%s", out.String())
+	}
+}
+
 func TestPrePushBlocksOnSemgrepFailure(t *testing.T) {
 	repo := initTempRepo(t)
 	writeFile(t, filepath.Join(repo, "app.go"), "package main\n")
@@ -128,6 +180,90 @@ exit 1
 	}
 	if !strings.Contains(err.Error(), "blocked") {
 		t.Fatalf("expected blocked error, got %v", err)
+	}
+}
+
+func TestCollectPrePushFilesIncludesAllUnpublishedCommitsOnNewBranch(t *testing.T) {
+	repo := initTempRepo(t)
+	remote := filepath.Join(t.TempDir(), "remote.git")
+
+	cmd := exec.Command("git", "init", "--bare", remote)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init --bare failed: %v\n%s", err, string(output))
+	}
+
+	runGit(t, repo, "checkout", "-b", "main")
+	writeFile(t, filepath.Join(repo, "base.txt"), "base\n")
+	runGit(t, repo, "add", "base.txt")
+	runGit(t, repo, "commit", "-m", "base")
+	runGit(t, repo, "remote", "add", "origin", remote)
+	runGit(t, repo, "push", "-u", "origin", "main")
+
+	runGit(t, repo, "checkout", "-b", "feature")
+	writeFile(t, filepath.Join(repo, "first.txt"), "first\n")
+	runGit(t, repo, "add", "first.txt")
+	runGit(t, repo, "commit", "-m", "first feature commit")
+
+	writeFile(t, filepath.Join(repo, "second.txt"), "second\n")
+	runGit(t, repo, "add", "second.txt")
+	runGit(t, repo, "commit", "-m", "second feature commit")
+
+	localSHA := strings.TrimSpace(runGitOutput(t, repo, "rev-parse", "HEAD"))
+	files, err := collectPrePushFiles(repo, "origin", []PushRef{{
+		LocalRef:  "refs/heads/feature",
+		LocalSHA:  localSHA,
+		RemoteRef: "refs/heads/feature",
+		RemoteSHA: strings.Repeat("0", 40),
+	}})
+	if err != nil {
+		t.Fatalf("collectPrePushFiles failed: %v", err)
+	}
+
+	got := strings.Join(files, ",")
+	if got != "first.txt,second.txt" {
+		t.Fatalf("expected both unpublished files, got %q", got)
+	}
+}
+
+func TestCollectPrePushFilesUsesPushRemoteForNewBranch(t *testing.T) {
+	repo := initTempRepo(t)
+	origin := filepath.Join(t.TempDir(), "origin.git")
+	fork := filepath.Join(t.TempDir(), "fork.git")
+
+	for _, remote := range []string{origin, fork} {
+		cmd := exec.Command("git", "init", "--bare", remote)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git init --bare failed: %v\n%s", err, string(output))
+		}
+	}
+
+	runGit(t, repo, "checkout", "-b", "main")
+	writeFile(t, filepath.Join(repo, "base.txt"), "base\n")
+	runGit(t, repo, "add", "base.txt")
+	runGit(t, repo, "commit", "-m", "base")
+	runGit(t, repo, "remote", "add", "origin", origin)
+	runGit(t, repo, "remote", "add", "fork", fork)
+	runGit(t, repo, "push", "-u", "origin", "main")
+
+	runGit(t, repo, "checkout", "-b", "feature")
+	writeFile(t, filepath.Join(repo, "feature.txt"), "feature\n")
+	runGit(t, repo, "add", "feature.txt")
+	runGit(t, repo, "commit", "-m", "feature commit")
+
+	localSHA := strings.TrimSpace(runGitOutput(t, repo, "rev-parse", "HEAD"))
+	files, err := collectPrePushFiles(repo, "fork", []PushRef{{
+		LocalRef:  "refs/heads/feature",
+		LocalSHA:  localSHA,
+		RemoteRef: "refs/heads/feature",
+		RemoteSHA: strings.Repeat("0", 40),
+	}})
+	if err != nil {
+		t.Fatalf("collectPrePushFiles failed: %v", err)
+	}
+
+	got := strings.Join(files, ",")
+	if got != "base.txt,feature.txt" {
+		t.Fatalf("expected files missing from fork remote, got %q", got)
 	}
 }
 

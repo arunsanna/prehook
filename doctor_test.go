@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"bytes"
+	"strings"
+	"testing"
+)
 
 func TestVersionSatisfies(t *testing.T) {
 	cases := []struct {
@@ -36,5 +40,21 @@ func TestVersionSatisfies(t *testing.T) {
 				t.Fatalf("versionSatisfies(%q, %q) = %v, want %v", tc.line, tc.pin, got, tc.wantOK)
 			}
 		})
+	}
+}
+
+func TestRunBinaryCheckAllowsMissingOptionalBinary(t *testing.T) {
+	var out bytes.Buffer
+	err := runBinaryCheck(binaryCheck{
+		Name:        "definitely-not-installed-prehook-binary",
+		VersionArgs: []string{"--version"},
+		Required:    false,
+		Hint:        "optional helper",
+	}, false, &out)
+	if err != nil {
+		t.Fatalf("expected optional missing binary to warn only, got %v", err)
+	}
+	if !strings.Contains(out.String(), "[WARN]") {
+		t.Fatalf("expected warning output, got %q", out.String())
 	}
 }

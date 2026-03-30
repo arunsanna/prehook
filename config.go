@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -199,6 +200,9 @@ func (c Config) Validate() error {
 		}
 		if entry.ExpiresOn == "" {
 			return fmt.Errorf("allowlist entry %d is missing expires_on", position)
+		}
+		if _, err := regexp.Compile(entry.Pattern); err != nil {
+			return fmt.Errorf("allowlist entry %d has invalid pattern: %w", position, err)
 		}
 		if _, err := time.Parse("2006-01-02", entry.ExpiresOn); err != nil {
 			return fmt.Errorf("allowlist entry %d has invalid expires_on, expected YYYY-MM-DD: %w", position, err)

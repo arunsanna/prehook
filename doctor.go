@@ -74,10 +74,11 @@ func runBinaryCheck(check binaryCheck, requirePins bool, stdout io.Writer) error
 	if err != nil {
 		if check.Required {
 			fmt.Fprintf(stdout, "[FAIL] %-14s missing (%s)\n", check.Name, check.Hint)
+			return err
 		} else {
 			fmt.Fprintf(stdout, "[WARN] %-14s missing (%s)\n", check.Name, check.Hint)
+			return nil
 		}
-		return err
 	}
 
 	result := RunBinary(8*time.Second, ".", check.Name, check.VersionArgs, nil)
