@@ -149,8 +149,8 @@ func writeHook(path string, content []byte, force bool, stdout io.Writer) error 
 				return fmt.Errorf("hook %s already exists and is not managed by prehook (use --force to back up and replace)", path)
 			}
 
-			backupPath := fmt.Sprintf("%s.prehook.bak.%d", path, time.Now().Unix())
-			if err := os.WriteFile(backupPath, existing, 0o644); err != nil {
+			backupPath := filepath.Clean(fmt.Sprintf("%s.prehook.bak.%d", path, time.Now().Unix()))
+			if err := os.WriteFile(backupPath, existing, 0o644); err != nil { //nolint:gosec // path derived from git hooks dir
 				return fmt.Errorf("backup %s: %w", path, err)
 			}
 			fmt.Fprintf(stdout, "Backed up existing hook to %s\n", backupPath)

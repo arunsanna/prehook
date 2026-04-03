@@ -76,6 +76,9 @@ func TestPreCommitWarnsOnUnknownTrufflehogFinding(t *testing.T) {
 }
 
 func TestPreCommitSuppressesAllowlistedGitleaksFinding(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses shell script stub not runnable on Windows")
+	}
 	repo := initTempRepo(t)
 	writeFile(t, filepath.Join(repo, "secret.txt"), "token=example-test-secret\n")
 	runGit(t, repo, "add", "secret.txt")

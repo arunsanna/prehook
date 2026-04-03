@@ -224,8 +224,8 @@ func resolveCoveragePercent(repoRoot string, coverageFile string, commandOutput 
 }
 
 func resolveCoveragePercentFromFile(repoRoot string, coverageFile string) (float64, error) {
-	full := filepath.Join(repoRoot, coverageFile)
-	data, err := os.ReadFile(full)
+	full := filepath.Clean(filepath.Join(repoRoot, coverageFile))
+	data, err := os.ReadFile(full) //nolint:gosec // coverageFile is from trusted .prehook.yaml config
 	if err != nil {
 		return 0, fmt.Errorf("read %s: %w", coverageFile, err)
 	}

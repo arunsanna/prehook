@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -55,9 +56,11 @@ func TestCmdInstallCreatesHooks(t *testing.T) {
 		if !bytes.Contains(content, []byte(managedHookMarker)) {
 			t.Fatalf("%s missing managed marker", name)
 		}
-		info, _ := os.Stat(path)
-		if info.Mode()&0o100 == 0 {
-			t.Fatalf("%s not executable", name)
+		if runtime.GOOS != "windows" {
+			info, _ := os.Stat(path)
+			if info.Mode()&0o100 == 0 {
+				t.Fatalf("%s not executable", name)
+			}
 		}
 	}
 }
