@@ -43,16 +43,7 @@ func cmdDoctor(args []string, stdout io.Writer, stderr io.Writer) error {
 		return err
 	}
 
-	checks := []binaryCheck{
-		{Name: "git", VersionArgs: []string{"--version"}, Required: true, Hint: "required for hook integration", Pin: cfg.ToolVersions.Git},
-		{Name: "go", VersionArgs: []string{"version"}, Required: true, Hint: "used by default quality and coverage gates", Pin: cfg.ToolVersions.Go},
-		{Name: "gitleaks", VersionArgs: []string{"version"}, Required: true, Hint: "required by pre-commit secret scan", Pin: cfg.ToolVersions.Gitleaks},
-		{Name: "trufflehog", VersionArgs: []string{"--version"}, Required: true, Hint: "required by pre-commit secret scan", Pin: cfg.ToolVersions.Trufflehog},
-		{Name: "semgrep", VersionArgs: []string{"--version"}, Required: true, Hint: "required by pre-push static analysis", Pin: cfg.ToolVersions.Semgrep},
-		{Name: "osv-scanner", VersionArgs: []string{"--version"}, Required: true, Hint: "required by pre-push dependency scan", Pin: cfg.ToolVersions.OSVScanner},
-		{Name: "trivy", VersionArgs: []string{"--version"}, Required: true, Hint: "required by pre-push repo/config scan", Pin: cfg.ToolVersions.Trivy},
-		{Name: "git-filter-repo", VersionArgs: []string{"--version"}, Required: false, Hint: "optional for cleanup history rewrites", Pin: cfg.ToolVersions.GitFilterRepo},
-	}
+	checks := buildDoctorChecks(cfg)
 
 	failureCount := 0
 	for _, check := range checks {
@@ -67,6 +58,19 @@ func cmdDoctor(args []string, stdout io.Writer, stderr io.Writer) error {
 
 	fmt.Fprintln(stdout, "Doctor checks passed")
 	return nil
+}
+
+func buildDoctorChecks(cfg Config) []binaryCheck {
+	return []binaryCheck{
+		{Name: "git", VersionArgs: []string{"--version"}, Required: true, Hint: "required for hook integration", Pin: cfg.ToolVersions.Git},
+		{Name: "go", VersionArgs: []string{"version"}, Required: cfg.PrePush.Quality.Enabled, Hint: "required when quality/coverage gates are enabled", Pin: cfg.ToolVersions.Go},
+		{Name: "gitleaks", VersionArgs: []string{"version"}, Required: cfg.PreCommit.Gitleaks.Enabled, Hint: "required by pre-commit secret scan", Pin: cfg.ToolVersions.Gitleaks},
+		{Name: "trufflehog", VersionArgs: []string{"--version"}, Required: cfg.PreCommit.Trufflehog.Enabled, Hint: "required by pre-commit secret scan", Pin: cfg.ToolVersions.Trufflehog},
+		{Name: "semgrep", VersionArgs: []string{"--version"}, Required: cfg.PrePush.Semgrep.Enabled, Hint: "required by pre-push static analysis", Pin: cfg.ToolVersions.Semgrep},
+		{Name: "osv-scanner", VersionArgs: []string{"--version"}, Required: cfg.PrePush.OSV.Enabled, Hint: "required by pre-push dependency scan", Pin: cfg.ToolVersions.OSVScanner},
+		{Name: "trivy", VersionArgs: []string{"--version"}, Required: cfg.PrePush.Trivy.Enabled, Hint: "required by pre-push repo/config scan", Pin: cfg.ToolVersions.Trivy},
+		{Name: "git-filter-repo", VersionArgs: []string{"--version"}, Required: false, Hint: "optional for cleanup history rewrites", Pin: cfg.ToolVersions.GitFilterRepo},
+	}
 }
 
 func runBinaryCheck(check binaryCheck, requirePins bool, stdout io.Writer) error {
