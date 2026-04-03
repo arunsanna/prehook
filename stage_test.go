@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestIsDependencyManifest(t *testing.T) {
@@ -147,5 +149,162 @@ func TestSummarizeTrufflehogFindingsMatchesRelevantFieldsOnly(t *testing.T) {
 	verified, unknown, suppressed = summarizeTrufflehogFindings(findings, allowlist)
 	if verified != 1 || unknown != 0 || suppressed != 0 {
 		t.Fatalf("expected metadata-only pattern not to suppress finding, got verified=%d unknown=%d suppressed=%d", verified, unknown, suppressed)
+	}
+}
+
+func TestParseTrufflehogFindingsEmpty(t *testing.T) {
+	findings, err := parseTrufflehogFindings("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("expected zero findings, got %d", len(findings))
+	}
+}
+
+func TestApplyAllowlistDowngradesMatchingIssue(t *testing.T) {
+	issues := []gateIssue{
+		{Gate: "gitleaks", Blocking: true, Message: "Potential secret", Output: "found fake-api-key in config.txt"},
+	}
+	entries := []AllowlistEntry{
+		{Pattern: "fake-api-key", Reason: "test fixture", Owner: "test", ExpiresOn: "2099-12-31"},
+	}
+
+	result := applyAllowlist(issues, entries)
+	if result[0].Blocking {
+		t.Fatal("expected allowlisted issue to be non-blocking")
+	}
+	if !strings.Contains(result[0].Message, "allowlisted") {
+		t.Fatalf("expected allowlisted annotation, got: %s", result[0].Message)
+	}
+}
+
+func TestApplyAllowlistIgnoresExpiredEntry(t *testing.T) {
+	issues := []gateIssue{
+		{Gate: "gitleaks", Blocking: true, Message: "Potential secret", Output: "found fake-api-key"},
+	}
+	entries := []AllowlistEntry{
+		{Pattern: "fake-api-key", Reason: "old exception", Owner: "test", ExpiresOn: "2020-01-01"},
+	}
+
+	result := applyAllowlist(issues, entries)
+	if !result[0].Blocking {
+		t.Fatal("expired allowlist entry should not downgrade the issue")
+	}
+}
+
+func TestApplyAllowlistNoMatchLeavesBlocking(t *testing.T) {
+	issues := []gateIssue{
+		{Gate: "gitleaks", Blocking: true, Message: "Potential secret", Output: "real-secret-detected"},
+	}
+	entries := []AllowlistEntry{
+		{Pattern: "fake-api-key", Reason: "test fixture", Owner: "test", ExpiresOn: "2099-12-31"},
+	}
+
+	result := applyAllowlist(issues, entries)
+	if !result[0].Blocking {
+		t.Fatal("non-matching allowlist should leave issue blocking")
+	}
+}
+
+func TestApplyAllowlistEmptyEntries(t *testing.T) {
+	issues := []gateIssue{
+		{Gate: "gitleaks", Blocking: true, Message: "secret found"},
+	}
+	result := applyAllowlist(issues, nil)
+	if !result[0].Blocking {
+		t.Fatal("nil allowlist should leave issue blocking")
+	}
+}
+
+func TestWarnExpiredAllowlist(t *testing.T) {
+	var out bytes.Buffer
+	entries := []AllowlistEntry{
+		{Pattern: "old-secret", Reason: "was test data", Owner: "security@co.com", ExpiresOn: "2020-01-01"},
+		{Pattern: "current-exception", Reason: "still valid", Owner: "team", ExpiresOn: "2099-12-31"},
+	}
+	warnExpiredAllowlist(entries, &out)
+
+	output := out.String()
+	if !strings.Contains(output, "old-secret") {
+		t.Fatal("expected warning for expired entry")
+	}
+	if strings.Contains(output, "current-exception") {
+		t.Fatal("should not warn about non-expired entry")
+	}
+}
+
+func TestFinalizeStageIssuesAllPass(t *testing.T) {
+	var out bytes.Buffer
+	err := finalizeStageIssues("pre-commit", nil, &out)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if !strings.Contains(out.String(), "all gates passed") {
+		t.Fatalf("expected all-pass message, got: %s", out.String())
+	}
+}
+
+func TestFinalizeStageIssuesWarningsOnly(t *testing.T) {
+	var out bytes.Buffer
+	issues := []gateIssue{
+		{Gate: "test", Blocking: false, Message: "minor issue"},
+	}
+	err := finalizeStageIssues("pre-push", issues, &out)
+	if err != nil {
+		t.Fatalf("warnings-only should not error, got: %v", err)
+	}
+	if !strings.Contains(out.String(), "completed with warnings only") {
+		t.Fatalf("expected warnings-only message, got: %s", out.String())
+	}
+}
+
+func TestFinalizeStageIssuesBlocking(t *testing.T) {
+	var out bytes.Buffer
+	issues := []gateIssue{
+		{Gate: "test", Blocking: true, Message: "critical failure"},
+	}
+	err := finalizeStageIssues("pre-commit", issues, &out)
+	if err == nil {
+		t.Fatal("expected blocking error")
+	}
+	if !strings.Contains(err.Error(), "blocked") {
+		t.Fatalf("expected blocked message, got: %v", err)
+	}
+}
+
+func TestParseDurationOr(t *testing.T) {
+	if d := parseDurationOr("5m", time.Minute); d != 5*time.Minute {
+		t.Fatalf("expected 5m, got %v", d)
+	}
+	if d := parseDurationOr("", 3*time.Minute); d != 3*time.Minute {
+		t.Fatalf("expected fallback 3m, got %v", d)
+	}
+	if d := parseDurationOr("bogus", 2*time.Minute); d != 2*time.Minute {
+		t.Fatalf("expected fallback 2m for invalid input, got %v", d)
+	}
+}
+
+func TestCmdCleanupPrintsGuidance(t *testing.T) {
+	var out bytes.Buffer
+	err := cmdCleanup(nil, &out, &out)
+	if err != nil {
+		t.Fatalf("cmdCleanup: %v", err)
+	}
+	output := out.String()
+	if !strings.Contains(output, "Revoke") {
+		t.Fatal("expected remediation guidance")
+	}
+	if !strings.Contains(output, "git filter-repo") {
+		t.Fatal("expected git-filter-repo guidance")
+	}
+}
+
+func TestHasManifestChanges(t *testing.T) {
+	if !hasManifestChanges([]string{"src/main.go", "go.mod"}) {
+		t.Fatal("expected go.mod to be detected as manifest")
+	}
+	if hasManifestChanges([]string{"src/main.go", "README.md"}) {
+		t.Fatal("expected no manifest detected")
 	}
 }

@@ -286,6 +286,16 @@ func withPathAndCwd(t *testing.T, binDir string, cwd string) {
 	})
 }
 
+// writeExecutable writes a raw script file. Use writeStubBinary for simple
+// version/output stubs; use this for complex shell logic that cannot be
+// expressed as a parameterized stub.
+func writeExecutable(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
+		t.Fatalf("write executable %s: %v", path, err)
+	}
+}
+
 // writeStubBinary creates a mock binary that responds to a version flag with
 // versionOutput and otherwise prints defaultOutput with the given exit code.
 // On Windows it writes a .cmd batch script; on Unix a sh script.

@@ -212,6 +212,8 @@ func runPreCommitStage(repoRoot string, cfg Config, allowlist []compiledAllowlis
 		}
 	}
 
+	warnExpiredAllowlist(cfg.Allowlist, stdout)
+	issues = applyAllowlist(issues, cfg.Allowlist)
 	return finalizeStageIssues("pre-commit", issues, stdout)
 }
 
@@ -300,6 +302,8 @@ func runPrePushStage(repoRoot string, remoteName string, refs []PushRef, cfg Con
 		}
 	}
 
+	warnExpiredAllowlist(cfg.Allowlist, stdout)
+	issues = applyAllowlist(issues, cfg.Allowlist)
 	return finalizeStageIssues("pre-push", issues, stdout)
 }
 
@@ -532,6 +536,38 @@ func trufflehogAllowlistCandidates(finding trufflehogFinding) []string {
 		filtered = append(filtered, candidate)
 	}
 	return filtered
+}
+
+func warnExpiredAllowlist(entries []AllowlistEntry, stdout io.Writer) {
+	today := time.Now().Format("2006-01-02")
+	for _, entry := range entries {
+		if entry.ExpiresOn != "" && entry.ExpiresOn < today {
+			fmt.Fprintf(stdout, "[WARN] allowlist entry %q expired on %s (owner: %s)\n", entry.Pattern, entry.ExpiresOn, entry.Owner)
+		}
+	}
+}
+
+func applyAllowlist(issues []gateIssue, entries []AllowlistEntry) []gateIssue {
+	today := time.Now().Format("2006-01-02")
+	var active []AllowlistEntry
+	for _, entry := range entries {
+		if entry.ExpiresOn == "" || entry.ExpiresOn >= today {
+			active = append(active, entry)
+		}
+	}
+	if len(active) == 0 {
+		return issues
+	}
+	for i, issue := range issues {
+		for _, entry := range active {
+			if strings.Contains(issue.Output, entry.Pattern) || strings.Contains(issue.Message, entry.Pattern) {
+				issues[i].Blocking = false
+				issues[i].Message += fmt.Sprintf(" [allowlisted: %s]", entry.Reason)
+				break
+			}
+		}
+	}
+	return issues
 }
 
 func finalizeStageIssues(stage string, issues []gateIssue, stdout io.Writer) error {
