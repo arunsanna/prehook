@@ -20,6 +20,8 @@ func runCLI(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) 
 		err = cmdInit(commandArgs, stdout, stderr)
 	case "install":
 		err = cmdInstall(commandArgs, stdout, stderr)
+	case "uninstall":
+		err = cmdUninstall(commandArgs, stdout, stderr)
 	case "doctor":
 		err = cmdDoctor(commandArgs, stdout, stderr)
 	case "run":
@@ -50,6 +52,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  prehook init")
 	fmt.Fprintln(w, "  prehook install")
+	fmt.Fprintln(w, "  prehook uninstall")
 	fmt.Fprintln(w, "  prehook doctor")
 	fmt.Fprintln(w, "  prehook run --stage pre-commit|pre-push")
 	fmt.Fprintln(w, "  prehook cleanup")

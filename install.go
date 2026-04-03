@@ -55,6 +55,51 @@ func cmdInstall(args []string, stdout io.Writer, stderr io.Writer) error {
 	return nil
 }
 
+func cmdUninstall(args []string, stdout io.Writer, stderr io.Writer) error {
+	flagSet := flag.NewFlagSet("uninstall", flag.ContinueOnError)
+	flagSet.SetOutput(stderr)
+	if err := flagSet.Parse(args); err != nil {
+		return err
+	}
+
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		return err
+	}
+
+	hooksDir, err := resolveHooksDir(repoRoot)
+	if err != nil {
+		return err
+	}
+
+	hooks := []string{"pre-commit", "pre-push"}
+	removed := 0
+	for _, name := range hooks {
+		path := filepath.Join(hooksDir, name)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return fmt.Errorf("read hook %s: %w", path, err)
+		}
+		if !bytes.Contains(content, []byte(managedHookMarker)) {
+			fmt.Fprintf(stdout, "Skipping %s (not managed by prehook)\n", path)
+			continue
+		}
+		if err := os.Remove(path); err != nil {
+			return fmt.Errorf("remove hook %s: %w", path, err)
+		}
+		fmt.Fprintf(stdout, "Removed %s\n", path)
+		removed++
+	}
+
+	if removed == 0 {
+		fmt.Fprintln(stdout, "No prehook-managed hooks found")
+	}
+	return nil
+}
+
 func hookScript(stage string, installBinary string) []byte {
 	script := fmt.Sprintf(`#!/bin/sh
 %s
