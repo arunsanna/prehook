@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,5 +82,90 @@ func TestValidateAllowlistPatternMustCompile(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "invalid pattern") {
 		t.Fatalf("expected invalid pattern error, got %v", err)
+	}
+}
+
+func TestValidateInvalidTimeout(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.PreCommit.Gitleaks.Timeout = "not-a-duration"
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for invalid timeout")
+	}
+	if !strings.Contains(err.Error(), "invalid duration") {
+		t.Fatalf("expected duration error, got %v", err)
+	}
+}
+
+func TestCmdInitCreatesConfig(t *testing.T) {
+	repo := initTempRepo(t)
+	if err := os.Chdir(repo); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(os.TempDir()) })
+
+	var out bytes.Buffer
+	if err := cmdInit(nil, &out, &out); err != nil {
+		t.Fatalf("cmdInit: %v\n%s", err, out.String())
+	}
+
+	configPath := filepath.Join(repo, ".prehook.yaml")
+	if _, err := os.Stat(configPath); err != nil {
+		t.Fatalf("config file not created: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("load created config: %v", err)
+	}
+	if cfg.Version != 1 {
+		t.Fatalf("expected version 1, got %d", cfg.Version)
+	}
+}
+
+func TestCmdInitRefusesOverwrite(t *testing.T) {
+	repo := initTempRepo(t)
+	if err := os.Chdir(repo); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(os.TempDir()) })
+
+	var out bytes.Buffer
+	_ = cmdInit(nil, &out, &out)
+
+	out.Reset()
+	err := cmdInit(nil, &out, &out)
+	if err == nil {
+		t.Fatal("expected error on second init without --force")
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("expected already-exists error, got: %v", err)
+	}
+}
+
+func TestCmdInitForceOverwrites(t *testing.T) {
+	repo := initTempRepo(t)
+	if err := os.Chdir(repo); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(os.TempDir()) })
+
+	var out bytes.Buffer
+	_ = cmdInit(nil, &out, &out)
+
+	out.Reset()
+	err := cmdInit([]string{"--force"}, &out, &out)
+	if err != nil {
+		t.Fatalf("cmdInit --force: %v", err)
+	}
+}
+
+func TestLoadConfigMissingFileReturnsDefaults(t *testing.T) {
+	cfg, err := LoadConfig(filepath.Join(t.TempDir(), "nonexistent.yaml"))
+	if err != nil {
+		t.Fatalf("expected no error for missing file, got: %v", err)
+	}
+	if cfg.Version != 1 {
+		t.Fatalf("expected default version 1, got %d", cfg.Version)
 	}
 }
