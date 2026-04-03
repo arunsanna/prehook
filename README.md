@@ -7,26 +7,26 @@ Stop secrets before they ship. `prehook` is a single-binary CLI that installs lo
 ### From source (requires Go 1.23+)
 
 ```bash
-go install github.com/arunlabs/prehook@latest
+go install github.com/arunsanna/prehook@latest
 ```
 
 ### Homebrew (macOS / Linux)
 
 ```bash
-brew tap arunlabs/tap
+brew tap arunsanna/tap
 brew install prehook
 ```
 
 ### Scoop (Windows)
 
 ```powershell
-scoop bucket add arunlabs https://github.com/arunlabs/scoop-bucket
+scoop bucket add arunsanna https://github.com/arunsanna/scoop-bucket
 scoop install prehook
 ```
 
 ### Binary download
 
-Download the latest release from the [Releases](https://github.com/arunlabs/prehook/releases) page.
+Download the latest release from the [Releases](https://github.com/arunsanna/prehook/releases) page.
 
 | Platform | Archive                                   | Binary        |
 | -------- | ----------------------------------------- | ------------- |
