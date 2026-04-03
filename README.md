@@ -167,7 +167,7 @@ allowlist:
 2. Render formula from template:
 
 ```bash
-scripts/prepare-homebrew-formula.sh \
+packaging/scripts/prepare-homebrew-formula.sh \
   --owner <github-owner> \
   --repo <github-repo> \
   --version <x.y.z>
@@ -176,7 +176,7 @@ scripts/prepare-homebrew-formula.sh \
 3. Copy `packaging/homebrew/prehook.rb` into your tap repo under `Formula/prehook.rb`.
 4. Publish release artifacts with `goreleaser`.
 
-Advanced manual rendering: `scripts/render-homebrew-formula.sh`.
+Advanced manual rendering: `packaging/scripts/render-homebrew-formula.sh`.
 Template file: `packaging/homebrew/prehook.rb.tmpl`.
 
 ## Caveat
