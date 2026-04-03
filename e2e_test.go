@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -29,14 +30,7 @@ func TestPreCommitBlocksOnVerifiedTrufflehogFinding(t *testing.T) {
 	writeConfig(t, repo, cfg)
 
 	binDir := t.TempDir()
-	writeExecutable(t, filepath.Join(binDir, "trufflehog"), `#!/bin/sh
-if [ "${1:-}" = "--version" ]; then
-  echo "trufflehog 3.90.0"
-  exit 0
-fi
-echo '{"Verified": true}'
-exit 0
-`)
+	writeStubBinary(t, binDir, "trufflehog", "--version", "trufflehog 3.90.0", `{"Verified": true}`, 0)
 
 	withPathAndCwd(t, binDir, repo)
 
@@ -67,14 +61,7 @@ func TestPreCommitWarnsOnUnknownTrufflehogFinding(t *testing.T) {
 	writeConfig(t, repo, cfg)
 
 	binDir := t.TempDir()
-	writeExecutable(t, filepath.Join(binDir, "trufflehog"), `#!/bin/sh
-if [ "${1:-}" = "--version" ]; then
-  echo "trufflehog 3.90.0"
-  exit 0
-fi
-echo '{"Verified": false}'
-exit 0
-`)
+	writeStubBinary(t, binDir, "trufflehog", "--version", "trufflehog 3.90.0", `{"Verified": false}`, 0)
 
 	withPathAndCwd(t, binDir, repo)
 
@@ -161,14 +148,7 @@ func TestPrePushBlocksOnSemgrepFailure(t *testing.T) {
 	writeConfig(t, repo, cfg)
 
 	binDir := t.TempDir()
-	writeExecutable(t, filepath.Join(binDir, "semgrep"), `#!/bin/sh
-if [ "${1:-}" = "--version" ]; then
-  echo "semgrep 1.90.0"
-  exit 0
-fi
-echo "rule violation"
-exit 1
-`)
+	writeStubBinary(t, binDir, "semgrep", "--version", "semgrep 1.90.0", "rule violation", 1)
 
 	withPathAndCwd(t, binDir, repo)
 
@@ -306,10 +286,25 @@ func withPathAndCwd(t *testing.T, binDir string, cwd string) {
 	})
 }
 
-func writeExecutable(t *testing.T, path string, content string) {
+// writeStubBinary creates a mock binary that responds to a version flag with
+// versionOutput and otherwise prints defaultOutput with the given exit code.
+// On Windows it writes a .cmd batch script; on Unix a sh script.
+func writeStubBinary(t *testing.T, dir string, name string, versionFlag string, versionOutput string, defaultOutput string, defaultExitCode int) {
 	t.Helper()
-	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
-		t.Fatalf("write executable %s: %v", path, err)
+	if runtime.GOOS == "windows" {
+		path := filepath.Join(dir, name+".cmd")
+		script := fmt.Sprintf("@echo off\r\nif \"%%~1\"==\"%s\" (\r\n  echo %s\r\n  exit /b 0\r\n)\r\necho %s\r\nexit /b %d\r\n",
+			versionFlag, versionOutput, defaultOutput, defaultExitCode)
+		if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+			t.Fatalf("write stub %s: %v", path, err)
+		}
+		return
+	}
+	path := filepath.Join(dir, name)
+	script := fmt.Sprintf("#!/bin/sh\nif [ \"${1:-}\" = \"%s\" ]; then\n  echo \"%s\"\n  exit 0\nfi\necho '%s'\nexit %d\n",
+		versionFlag, versionOutput, defaultOutput, defaultExitCode)
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatalf("write stub %s: %v", path, err)
 	}
 }
 
