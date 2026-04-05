@@ -144,5 +144,5 @@ prehook is open source: [github.com/arunsanna/prehook](https://github.com/arunsa
 
 **Suggested images:**
 
-- Use `diagram_secret_leak_timeline.png` as the article cover image
-- Use `diagram_two_gate_architecture.png` inline at the two-gate section
+- Use `images/diagram_secret_leak_timeline.png` as the article cover image
+- Use `images/diagram_two_gate_architecture.png` inline at the two-gate section

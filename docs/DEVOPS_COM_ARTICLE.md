@@ -10,7 +10,7 @@ The GitGuardian 2026 State of Secrets Sprawl report found 29 million secrets det
 
 Rotation mitigates the immediate risk. It doesn't eliminate the exposure window. And it doesn't address the root cause: the secret should never have been committed.
 
-![Secret leak timeline comparison](diagram_secret_leak_timeline.png)
+![Secret leak timeline comparison](images/diagram_secret_leak_timeline.png)
 _Figure 1: Without local security gates, secrets reach the remote before CI can intervene. With local gates, the commit is blocked before anything leaves the developer's machine._
 
 ## Two Gates, Two Purposes
@@ -21,7 +21,7 @@ The **pre-commit gate** focuses on secret detection. Before a commit is finalize
 
 The **pre-push gate** handles broader security and quality concerns. Before code reaches the remote, the hook runs static analysis on changed files, checks dependency manifests against known vulnerability databases, and optionally enforces test coverage thresholds. This gate is heavier, so it runs at push time rather than on every commit.
 
-![Two-gate architecture](diagram_two_gate_architecture.png)
+![Two-gate architecture](images/diagram_two_gate_architecture.png)
 _Figure 2: The two-gate model separates fast secret detection (pre-commit) from deeper security and quality scanning (pre-push)._
 
 This separation matters. Secret detection needs to be fast and run on every commit -- developers will bypass a hook that adds 30 seconds to their commit cycle. Vulnerability scanning and test execution are slower but acceptable at push time, when the developer is already context-switching.
@@ -86,7 +86,7 @@ Note: `prehook init` generates a default configuration with quality gates disabl
 
 The `doctor` command validates the local environment, checking that each enabled scanner is installed and optionally enforcing version pins. This is particularly useful for team onboarding -- add `prehook doctor` to your setup documentation, and new developers know exactly what's missing before they write their first commit.
 
-![Detection flow](diagram_detection_flow.png)
+![Detection flow](images/diagram_detection_flow.png)
 _Figure 3: When prehook catches a secret, the commit is blocked. The developer rotates the credential, removes it from code, and re-commits. Verified secrets are always blocked; unverified findings follow the team's configured policy._
 
 ## What This Pattern Doesn't Solve
